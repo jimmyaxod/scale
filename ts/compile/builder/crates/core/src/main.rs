@@ -14,41 +14,30 @@ use quickjs_wasm_sys::{
 };
 use std::os::raw::{c_char, c_int, c_void};
 
-use std::ffi::CString;
-
-use lazy_static::lazy_static;
-use std::sync::Mutex;
-
 use quickjs_wasm_rs::{Context, Value};
-
-use once_cell::sync::OnceCell;
-use std::io::{self, Read};
 
 use utils::{pack_uint32, unpack_uint32, vec_to_js, js_to_vec, set_buffer, resize_buffer, set_next_buffer};
 use utils::{PTR, LEN, READ_BUFFER, NEXT_PTR, NEXT_LEN, NEXT_READ_BUFFER};
 
-use std::io::{Cursor, Write};
+use std::io::{self, Cursor, Read, Write};
 
-use std::mem;
-use std::mem::{MaybeUninit};
 extern crate wee_alloc;
 
 #[cfg(not(test))]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
+
+use once_cell::sync::OnceCell;
 static mut JS_CONTEXT: OnceCell<Context> = OnceCell::new();
-static mut ENTRYPOINT: (OnceCell<Value>, OnceCell<Value>) = (OnceCell::new(), OnceCell::new());
-static mut ENTRYPOINT2: (OnceCell<Value>, OnceCell<Value>) = (OnceCell::new(), OnceCell::new());
-static mut ENTRYPOINT3: (OnceCell<Value>, OnceCell<Value>) = (OnceCell::new(), OnceCell::new());
+
+static mut ENTRY_EXPORTS: OnceCell<Value> = OnceCell::new();
+
+static mut ENTRY_MAIN: OnceCell<Value> = OnceCell::new();
+static mut ENTRY_RUN: OnceCell<Value> = OnceCell::new();
+static mut ENTRY_RESIZE: OnceCell<Value> = OnceCell::new();
+
 static SCRIPT_NAME: &str = "script.js";
-
-// TODO
-//
-// AOT validations:
-//  1. Ensure that the required exports are present
-//  2. If not present just evaluate the top level statement (?)
-
 
 // The function env.next exported by the host
 #[link(wasm_import_module = "env")]
@@ -70,6 +59,12 @@ fn nextwrap(context: *mut JSContext, jsval1: JSValue, int1: c_int, jsval2: *mut 
   }
 }
 
+#[cfg_attr(all(target_arch = "wasm32"), export_name = "resize")]
+#[no_mangle]
+pub unsafe extern "C" fn resize(size: u32) -> *const u8 {
+  return resize_buffer(size);
+}
+
 
 #[export_name = "wizer.initialize"]
 pub extern "C" fn init() {
@@ -85,36 +80,31 @@ pub extern "C" fn init() {
         let _ = context.eval_global(SCRIPT_NAME, &contents).unwrap();
         let global = context.global_object().unwrap();
         let exports = global.get_property("Exports").unwrap();
-        let main = exports.get_property("main").unwrap();
 
         // Setup a function called next() in the global_object
         let cb = context.new_callback(nextwrap).unwrap();
         global.set_property("scale_fn_next", cb);    // Callback to the 'next' host export.
 
         JS_CONTEXT.set(context).unwrap();
-        ENTRYPOINT.0.set(exports).unwrap();
-        ENTRYPOINT.1.set(main).unwrap();
 
-        let exports2 = global.get_property("Exports").unwrap();
-        let runfn = exports2.get_property("run").unwrap();
-        ENTRYPOINT2.0.set(exports2).unwrap();
-        ENTRYPOINT2.1.set(runfn).unwrap();
+        let main = exports.get_property("main").unwrap();
+        ENTRY_MAIN.set(main).unwrap();
 
-        let exports3 = global.get_property("Exports").unwrap();
-        let resizefn = exports3.get_property("resize").unwrap();
-        ENTRYPOINT3.0.set(exports3).unwrap();
-        ENTRYPOINT3.1.set(resizefn).unwrap();
+        let runfn = exports.get_property("run").unwrap();
+        ENTRY_RUN.set(runfn).unwrap();
+
+        ENTRY_EXPORTS.set(exports).unwrap();
     }
 }
 
 fn main() {
     unsafe {
         let context = JS_CONTEXT.get().unwrap();
-        let shopify = ENTRYPOINT.0.get().unwrap();
-        let main = ENTRYPOINT.1.get().unwrap();
+        let exports = ENTRY_EXPORTS.get().unwrap();
+        let main = ENTRY_MAIN.get().unwrap();
 
         let array = context.array_value().unwrap();       // Just send in empty array for now...
-        let output_value = main.call(shopify, &[array]);
+        let output_value = main.call(exports, &[array]);
 
         if output_value.is_err() {
             panic!("{}", output_value.unwrap_err().to_string());
@@ -126,8 +116,8 @@ fn main() {
 fn run((ptr, len): (i32, i32)) -> u64 {
   unsafe {
     let context = JS_CONTEXT.get().unwrap();
-    let exports = ENTRYPOINT2.0.get().unwrap();
-    let main = ENTRYPOINT2.1.get().unwrap();
+    let exports = ENTRY_EXPORTS.get().unwrap();
+    let runfn = ENTRY_RUN.get().unwrap();
 
     // Look at what has been written to the input buffer...
     // NB Possibly we should use the args ptr/len
@@ -143,7 +133,7 @@ fn run((ptr, len): (i32, i32)) -> u64 {
     }
   
     // Now we need to add the bytes in
-    let output_value = main.call(exports, &[array]);
+    let output_value = runfn.call(exports, &[array]);
 
     // output_value should be a byte array again...
 
@@ -171,10 +161,4 @@ fn run((ptr, len): (i32, i32)) -> u64 {
 
     return pack_uint32(ptr, len);
   }
-}
-
-#[cfg_attr(all(target_arch = "wasm32"), export_name = "resize")]
-#[no_mangle]
-pub unsafe extern "C" fn resize(size: u32) -> *const u8 {
-  return resize_buffer(size);
 }
