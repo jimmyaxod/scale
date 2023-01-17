@@ -18,7 +18,6 @@ use std::os::raw::{c_char, c_int, c_void};
 
 use std::ffi::CString;
 
-
 use lazy_static::lazy_static;
 use std::sync::Mutex;
 
@@ -27,7 +26,7 @@ use quickjs_wasm_rs::{Context, Value};
 use once_cell::sync::OnceCell;
 use std::io::{self, Read};
 
-use utils::{pack_uint32, unpack_uint32};
+use utils::{pack_uint32, unpack_uint32, vec_to_js, js_to_vec};
 
 use std::io::{Cursor, Write};
 
@@ -61,44 +60,6 @@ static SCRIPT_NAME: &str = "script.js";
 //  1. Ensure that the required exports are present
 //  2. If not present just evaluate the top level statement (?)
 
-
-// Convert a vec to a JSValue array of bytes
-fn vec_to_js(context: *mut JSContext, v: Vec<u8>) -> JSValue {
-  unsafe {
-    let array = JS_NewArray(context);
-    let mut index: u32 = 0;
-    for val in v.iter() {
-      let jval = JS_NewInt32_Ext(context, i32::from(*val));
-      JS_DefinePropertyValueUint32(
-          context,
-          array,
-          index,
-          jval,
-          JS_PROP_C_W_E as i32,
-      );
-      index += 1;
-    }
-    return array;
-  }
-}
-
-fn js_to_vec(context: *mut JSContext, v: JSValue) -> Vec<u8> {
-  let mut cursor = Cursor::new(Vec::new());
-
-  // The input (jsval2) is expected to be an array of bytes.
-  let cstring_key = CString::new("length").unwrap();
-  let len = unsafe { JS_GetPropertyStr(context, v, cstring_key.as_ptr()) } as u32;
-
-  for i in 0..len {
-    let v = unsafe { JS_GetPropertyUint32(context, v, i) } as u8;
-    let nval:&[u8] = &[v];
-    cursor.write(nval);
-  }
-
-  let mut vec = cursor.into_inner();
-  vec.shrink_to_fit();
-  return vec;
-}
 
 // The function env.next exported by the host
 #[link(wasm_import_module = "env")]
