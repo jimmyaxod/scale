@@ -4,7 +4,6 @@
   "description": "TypeScript version of the scale functions.",
   "browserslist": "> 0.5%, last 2 versions, not dead",
   "default": "dist/browser.html",
-  "module": "dist/module.js",
   "targets": {
     "default": {
       "source": "src/web/index.html",
@@ -12,9 +11,6 @@
       "isLibrary": false,
       "optimize": true,
       "includeNodeModules": true
-    },
-    "module": {
-      "source": "src/index.ts"
     }
   },
   "scripts": {
