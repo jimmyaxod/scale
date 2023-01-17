@@ -1,8 +1,6 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
-mod engine;
-
 #[path = "utils/utils.rs"]
 mod utils;
 
