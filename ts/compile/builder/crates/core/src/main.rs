@@ -26,23 +26,14 @@ use quickjs_wasm_rs::{Context, Value};
 use once_cell::sync::OnceCell;
 use std::io::{self, Read};
 
-use utils::{pack_uint32, unpack_uint32, vec_to_js, js_to_vec};
+use utils::{pack_uint32, unpack_uint32, vec_to_js, js_to_vec, set_buffer, resize_buffer, set_next_buffer};
+use utils::{PTR, LEN, READ_BUFFER, NEXT_PTR, NEXT_LEN, NEXT_READ_BUFFER};
 
 use std::io::{Cursor, Write};
 
 use std::mem;
 use std::mem::{MaybeUninit};
 extern crate wee_alloc;
-
-lazy_static! {
-  pub static ref PTR: Mutex<u32> = Mutex::new(0);
-  pub static ref LEN: Mutex<u32> = Mutex::new(0);
-  pub static ref READ_BUFFER: Mutex<Vec<u8>> = Mutex::new(Vec::with_capacity(0));
-
-  pub static ref NEXT_PTR: Mutex<u32> = Mutex::new(0);
-  pub static ref NEXT_LEN: Mutex<u32> = Mutex::new(0);
-  pub static ref NEXT_READ_BUFFER: Mutex<Vec<u8>> = Mutex::new(Vec::with_capacity(0));
-}
 
 #[cfg(not(test))]
 #[global_allocator]
@@ -72,7 +63,7 @@ extern "C" {
 fn nextwrap(context: *mut JSContext, jsval1: JSValue, int1: c_int, jsval2: *mut JSValue, int2: c_int) -> JSValue {
   unsafe {
     let vec = js_to_vec(context, *jsval2);
-    let (ptr, len) = setNextBuffer(vec);
+    let (ptr, len) = set_next_buffer(vec);
 
     let packed = _next(ptr, len);
     let (ptr, len) = unpack_uint32(packed);    
@@ -81,25 +72,6 @@ fn nextwrap(context: *mut JSContext, jsval1: JSValue, int1: c_int, jsval2: *mut 
   }
 }
 
-fn setBuffer(v: Vec<u8>) -> (u32, u32) {
-  let ptr = v.as_ptr() as u32;
-  let len = v.len() as u32;
-
-  *READ_BUFFER.lock().unwrap() = v;
-  *PTR.lock().unwrap() = ptr;
-  *LEN.lock().unwrap() = len;
-  return (ptr, len);
-}
-
-fn setNextBuffer(v: Vec<u8>) -> (u32, u32) {
-  let ptr = v.as_ptr() as u32;
-  let len = v.len() as u32;
-
-  *NEXT_READ_BUFFER.lock().unwrap() = v;
-  *NEXT_PTR.lock().unwrap() = ptr;
-  *NEXT_LEN.lock().unwrap() = len;
-  return (ptr, len);
-}
 
 #[export_name = "wizer.initialize"]
 pub extern "C" fn init() {
@@ -197,7 +169,7 @@ fn run((ptr, len): (i32, i32)) -> u64 {
     let mut vec = cursor.into_inner();
     vec.shrink_to_fit();
 
-    let (ptr, len) = setBuffer(vec);
+    let (ptr, len) = set_buffer(vec);
 
     return pack_uint32(ptr, len);
   }
@@ -206,11 +178,5 @@ fn run((ptr, len): (i32, i32)) -> u64 {
 #[cfg_attr(all(target_arch = "wasm32"), export_name = "resize")]
 #[no_mangle]
 pub unsafe extern "C" fn resize(size: u32) -> *const u8 {
-   let existing_cap = READ_BUFFER.lock().unwrap().capacity() as u32;
-   READ_BUFFER.lock().unwrap().reserve_exact((size - existing_cap) as usize);
-   let ptr = READ_BUFFER.lock().unwrap().as_ptr();
-
-   *PTR.lock().unwrap() = ptr as u32;
-   *LEN.lock().unwrap() = size;
-   return ptr
+  return resize_buffer(size);
 }

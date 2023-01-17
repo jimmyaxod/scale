@@ -15,6 +15,48 @@ use std::os::raw::{c_char, c_int, c_void};
 use std::ffi::CString;
 use std::io::{Cursor, Write};
 
+use lazy_static::lazy_static;
+use std::sync::Mutex;
+
+lazy_static! {
+  pub static ref PTR: Mutex<u32> = Mutex::new(0);
+  pub static ref LEN: Mutex<u32> = Mutex::new(0);
+  pub static ref READ_BUFFER: Mutex<Vec<u8>> = Mutex::new(Vec::with_capacity(0));
+
+  pub static ref NEXT_PTR: Mutex<u32> = Mutex::new(0);
+  pub static ref NEXT_LEN: Mutex<u32> = Mutex::new(0);
+  pub static ref NEXT_READ_BUFFER: Mutex<Vec<u8>> = Mutex::new(Vec::with_capacity(0));
+}
+
+pub fn set_buffer(v: Vec<u8>) -> (u32, u32) {
+  let ptr = v.as_ptr() as u32;
+  let len = v.len() as u32;
+
+  *READ_BUFFER.lock().unwrap() = v;
+  *PTR.lock().unwrap() = ptr;
+  *LEN.lock().unwrap() = len;
+  return (ptr, len);
+}
+
+pub unsafe fn resize_buffer(size: u32) -> *const u8 {
+  let existing_cap = READ_BUFFER.lock().unwrap().capacity() as u32;
+  READ_BUFFER.lock().unwrap().reserve_exact((size - existing_cap) as usize);
+  let ptr = READ_BUFFER.lock().unwrap().as_ptr();
+
+  *PTR.lock().unwrap() = ptr as u32;
+  *LEN.lock().unwrap() = size;
+  return ptr
+}
+
+pub fn set_next_buffer(v: Vec<u8>) -> (u32, u32) {
+  let ptr = v.as_ptr() as u32;
+  let len = v.len() as u32;
+
+  *NEXT_READ_BUFFER.lock().unwrap() = v;
+  *NEXT_PTR.lock().unwrap() = ptr;
+  *NEXT_LEN.lock().unwrap() = len;
+  return (ptr, len);
+}
 
 pub fn pack_uint32(ptr: u32, len: u32) -> u64 {
     return ((ptr as u64) << 32) | len as u64;
