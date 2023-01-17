@@ -1,0 +1,11 @@
+[workspace]
+members = [
+  "crates/quickjs-wasm-sys",
+  "crates/quickjs-wasm-rs",
+  "crates/core",
+  "crates/cli",
+]
+
+[profile.release]
+lto = true
+opt-level = 3
