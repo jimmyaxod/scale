@@ -7,10 +7,10 @@ mod utils;
 use quickjs_wasm_sys::{
   ext_js_exception, ext_js_null, ext_js_undefined, size_t as JS_size_t, JSCFunctionData,
   JSContext, JSValue, JS_Eval, JS_FreeCString, JS_GetGlobalObject, JS_NewArray, JS_NewBigInt64,
-  JS_NewBool_Ext, JS_NewCFunctionData, JS_NewContext, JS_NewFloat64_Ext, JS_NewInt32_Ext,
+  JS_Call, JS_NewBool_Ext, JS_NewCFunctionData, JS_NewContext, JS_NewFloat64_Ext, JS_NewInt32_Ext,
   JS_NewInt64_Ext, JS_NewObject, JS_NewRuntime, JS_NewStringLen, JS_NewUint32_Ext,
   JS_ToCStringLen2, JS_EVAL_TYPE_GLOBAL, JS_GetPropertyStr, JS_GetPropertyUint32, 
-  JS_DefinePropertyValueUint32, JS_PROP_C_W_E,
+  JS_DefinePropertyValueStr, JS_DefinePropertyValueUint32, JS_PROP_C_W_E,
 };
 use std::os::raw::{c_char, c_int, c_void};
 
@@ -20,6 +20,7 @@ use utils::{pack_uint32, unpack_uint32, vec_to_js, js_to_vec, set_buffer, resize
 use utils::{PTR, LEN, READ_BUFFER, NEXT_PTR, NEXT_LEN, NEXT_READ_BUFFER};
 
 use std::io::{self, Cursor, Read, Write};
+use std::ffi::CString;
 
 extern crate wee_alloc;
 
@@ -29,13 +30,13 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 
 use once_cell::sync::OnceCell;
-static mut JS_CONTEXT: OnceCell<Context> = OnceCell::new();
+static mut JS_CONTEXT: OnceCell<*mut JSContext> = OnceCell::new();
 
-static mut ENTRY_EXPORTS: OnceCell<Value> = OnceCell::new();
+static mut ENTRY_EXPORTS: OnceCell<JSValue> = OnceCell::new();
 
-static mut ENTRY_MAIN: OnceCell<Value> = OnceCell::new();
-static mut ENTRY_RUN: OnceCell<Value> = OnceCell::new();
-static mut ENTRY_RESIZE: OnceCell<Value> = OnceCell::new();
+static mut ENTRY_MAIN: OnceCell<JSValue> = OnceCell::new();
+static mut ENTRY_RUN: OnceCell<JSValue> = OnceCell::new();
+static mut ENTRY_RESIZE: OnceCell<JSValue> = OnceCell::new();
 
 static SCRIPT_NAME: &str = "script.js";
 
@@ -69,32 +70,139 @@ pub unsafe extern "C" fn resize(size: u32) -> *const u8 {
 #[export_name = "wizer.initialize"]
 pub extern "C" fn init() {
     unsafe {
-        let mut context = Context::default();
-        context
-            .register_globals(io::stderr(), io::stderr())
-            .unwrap();
+        let runtime = JS_NewRuntime();
+        if runtime.is_null() {
+          panic!("Couldn't create JavaScript runtime");
+        }
+        let context = JS_NewContext(runtime);
+        if context.is_null() {
+          panic!("Couldn't create JavaScript context");
+        }
 
         let mut contents = String::new();
         io::stdin().read_to_string(&mut contents).unwrap();
 
-        let _ = context.eval_global(SCRIPT_NAME, &contents).unwrap();
-        let global = context.global_object().unwrap();
-        let exports = global.get_property("Exports").unwrap();
+        let len = contents.len() - 1;
+        let input = CString::new(contents).unwrap();
+        let script_name = CString::new(SCRIPT_NAME).unwrap();
+        JS_Eval(context, input.as_ptr(), len as _, script_name.as_ptr(), JS_EVAL_TYPE_GLOBAL as i32);
+
+        let global = JS_GetGlobalObject(context);
+        let exports_key = CString::new("Exports").unwrap();
+        let exports = JS_GetPropertyStr(context, global, exports_key.as_ptr());
+
+        let main_key = CString::new("main").unwrap();
+        let main_fn = JS_GetPropertyStr(context, exports, main_key.as_ptr());
+        ENTRY_MAIN.set(main_fn).unwrap();
+
+        let run_key = CString::new("run").unwrap();
+        let run_fn = JS_GetPropertyStr(context, exports, run_key.as_ptr());
+        ENTRY_RUN.set(run_fn).unwrap();
+
+        let log_cb = console_log_to(io::stderr());
+        let error_cb = console_log_to(io::stderr());
+
+        let console = JS_NewObject(context);
+        set_callback(context, console, "log", log_cb);
+        set_callback(context, console, "error", error_cb);
+
+        let console_name = CString::new("console").unwrap();
+        JS_DefinePropertyValueStr(context, global, console_name.as_ptr(), console, JS_PROP_C_W_E as i32);
+
+
+        // TODO... at the moment anything logged via (console.log/console.error) will not come through.
+        //context.register_globals(io::stderr(), io::stderr()).unwrap();
+
+
+        /*
+        let console_log_callback = unsafe { self.new_callback(console_log_to(log_stream))? };
+        let console_error_callback = unsafe { self.new_callback(console_log_to(error_stream))? };
+        let global_object = self.global_object()?;
+        let console_object = self.object_value()?;
+        console_object.set_property("log", console_log_callback)?;
+        console_object.set_property("error", console_error_callback)?;
+        global_object.set_property("console", console_object)?;
+*/
+
 
         // Setup a function called next() in the global_object
-        let cb = context.new_callback(nextwrap).unwrap();
-        global.set_property("scale_fn_next", cb);    // Callback to the 'next' host export.
-
-        JS_CONTEXT.set(context).unwrap();
-
-        let main = exports.get_property("main").unwrap();
-        ENTRY_MAIN.set(main).unwrap();
-
-        let runfn = exports.get_property("run").unwrap();
-        ENTRY_RUN.set(runfn).unwrap();
+        set_callback(context, global, "scale_fn_next", &nextwrap);
 
         ENTRY_EXPORTS.set(exports).unwrap();
+
+        JS_CONTEXT.set(context).unwrap();
     }
+}
+
+fn set_callback<F>(context: *mut JSContext, global: JSValue, fn_name: impl Into<Vec<u8>>, f: F)
+where
+  F: FnMut(*mut JSContext, JSValue, c_int, *mut JSValue, c_int) -> JSValue,
+{
+  unsafe {
+    let trampoline = build_trampoline(&f);
+    let data = &f as *const _ as *mut c_void as *mut JSValue;
+    let cb = JS_NewCFunctionData(context, trampoline, 0, 1, 1, data);
+
+    let name_fn = CString::new(fn_name).unwrap();
+
+    JS_DefinePropertyValueStr(context, global, name_fn.as_ptr(), cb, JS_PROP_C_W_E as i32);
+  }
+}
+
+fn build_trampoline<F>(_f: &F) -> JSCFunctionData
+where
+    F: FnMut(*mut JSContext, JSValue, c_int, *mut JSValue, c_int) -> JSValue,
+{
+    // We build a trampoline to jump between c <-> rust and allow closing over a specific context.
+    // For more info around how this works, see https://adventures.michaelfbryan.com/posts/rust-closures-in-ffi/.
+    unsafe extern "C" fn trampoline<F>(
+        ctx: *mut JSContext,
+        this: JSValue,
+        argc: c_int,
+        argv: *mut JSValue,
+        magic: c_int,
+        data: *mut JSValue,
+    ) -> JSValue
+    where
+        F: FnMut(*mut JSContext, JSValue, c_int, *mut JSValue, c_int) -> JSValue,
+    {
+        let closure_ptr = data;
+        let closure: &mut F = &mut *(closure_ptr as *mut F);
+        (*closure)(ctx, this, argc, argv, magic)
+    }
+
+    Some(trampoline::<F>)
+}
+
+fn console_log_to<T>(
+  mut stream: T,
+) -> impl FnMut(*mut JSContext, JSValue, c_int, *mut JSValue, c_int) -> JSValue
+where
+  T: Write,
+{
+  move |ctx: *mut JSContext, _this: JSValue, argc: c_int, argv: *mut JSValue, _magic: c_int| {
+      let mut len: JS_size_t = 0;
+      for i in 0..argc {
+          if i != 0 {
+              write!(stream, " ").unwrap();
+          }
+
+          let str_ptr = unsafe { JS_ToCStringLen2(ctx, &mut len, *argv.offset(i as isize), 0) };
+          if str_ptr.is_null() {
+              return unsafe { ext_js_exception };
+          }
+
+          let str_ptr = str_ptr as *const u8;
+          let str_len = len as usize;
+          let buffer = unsafe { std::slice::from_raw_parts(str_ptr, str_len) };
+
+          stream.write_all(buffer).unwrap();
+          unsafe { JS_FreeCString(ctx, str_ptr as *const i8) };
+      }
+
+      writeln!(stream,).unwrap();
+      unsafe { ext_js_undefined }
+  }
 }
 
 fn main() {
@@ -103,14 +211,15 @@ fn main() {
         let exports = ENTRY_EXPORTS.get().unwrap();
         let main = ENTRY_MAIN.get().unwrap();
 
-        let array = context.array_value().unwrap();       // Just send in empty array for now...
-        let output_value = main.call(exports, &[array]);
+        let args: Vec<JSValue> = Vec::new();
+        let ret = JS_Call(*context, *main, *exports, args.len() as i32, args.as_slice().as_ptr() as *mut JSValue);
 
-        if output_value.is_err() {
-            panic!("{}", output_value.unwrap_err().to_string());
-        }
+        println!("ret is {ret}");
     }
 }
+
+/*
+TODO: Convert the 'run' function...
 
 #[export_name = "run"]
 fn run((ptr, len): (i32, i32)) -> u64 {
@@ -162,3 +271,5 @@ fn run((ptr, len): (i32, i32)) -> u64 {
     return pack_uint32(ptr, len);
   }
 }
+
+*/
