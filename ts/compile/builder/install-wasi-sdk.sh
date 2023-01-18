@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-PATH_TO_SDK="crates/quickjs-wasm-sys/wasi-sdk"
+PATH_TO_SDK="wasi-sdk"
 if [[ ! -d $PATH_TO_SDK ]]; then
     TMPGZ=$(mktemp)
     VERSION_MAJOR="12"
@@ -15,3 +15,6 @@ if [[ ! -d $PATH_TO_SDK ]]; then
     mkdir $PATH_TO_SDK
     tar xf $TMPGZ -C $PATH_TO_SDK --strip-components=1
 fi
+
+# NB This doesn't set externally, so we'd need to build here or something...
+export QUICKJS_WASM_SYS_WASI_SDK_PATH=`pwd`/${PATH_TO_SDK}

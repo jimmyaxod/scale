@@ -34,13 +34,7 @@ test-cli: core
 
 tests: test-core test-cli
 
-fmt: fmt-quickjs-wasm-sys fmt-core fmt-cli
-
-fmt-quickjs-wasm-sys:
-		cd crates/quickjs-wasm-sys/ \
-				&& cargo fmt -- --check \
-				&& cargo clippy --target=wasm32-wasi -- -D warnings \
-				&& cd -
+fmt: fmt-core fmt-cli
 
 fmt-core:
 		cd crates/core/ \
