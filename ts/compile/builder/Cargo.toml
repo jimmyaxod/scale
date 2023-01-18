@@ -1,7 +1,6 @@
 [workspace]
 members = [
   "crates/quickjs-wasm-sys",
-  "crates/quickjs-wasm-rs",
   "crates/core",
   "crates/cli",
 ]

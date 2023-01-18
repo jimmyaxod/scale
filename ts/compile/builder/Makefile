@@ -20,11 +20,6 @@ docs:
 				&& cargo doc --open --target=wasm32-wasi \
 				&& cd -
 
-test-quickjs-wasm-rs:
-		cd crates/quickjs-wasm-rs \
-				&& cargo wasi test --features json \
-				&& cd -
-
 test-core:
 		cd crates/core \
 				&& cargo wasi test -- --nocapture \
@@ -37,18 +32,12 @@ test-cli: core
 				&& cargo test --release \
 				&& cd -
 
-tests: test-quickjs-wasm-rs test-core test-cli
+tests: test-core test-cli
 
-fmt: fmt-quickjs-wasm-sys fmt-quickjs-wasm-rs fmt-core fmt-cli
+fmt: fmt-quickjs-wasm-sys fmt-core fmt-cli
 
 fmt-quickjs-wasm-sys:
 		cd crates/quickjs-wasm-sys/ \
-				&& cargo fmt -- --check \
-				&& cargo clippy --target=wasm32-wasi -- -D warnings \
-				&& cd -
-
-fmt-quickjs-wasm-rs:
-		cd crates/quickjs-wasm-rs/ \
 				&& cargo fmt -- --check \
 				&& cargo clippy --target=wasm32-wasi -- -D warnings \
 				&& cd -

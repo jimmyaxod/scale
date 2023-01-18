@@ -16,8 +16,6 @@ use quickjs_wasm_sys::{
 };
 use std::os::raw::{c_char, c_int, c_void};
 
-use quickjs_wasm_rs::{Context, Value};
-
 use utils::{pack_uint32, unpack_uint32, vec_to_js, js_to_vec, set_buffer, resize_buffer, set_next_buffer};
 use utils::{PTR, LEN, READ_BUFFER, NEXT_PTR, NEXT_LEN, NEXT_READ_BUFFER};
 
@@ -200,23 +198,18 @@ fn main() {
 
         let args: Vec<JSValue> = Vec::new();
         let ret = JS_Call(*context, *main, *exports, args.len() as i32, args.as_slice().as_ptr() as *mut JSValue);
-
-        println!("ret is {ret}");
     }
 }
 
 
 #[export_name = "run"]
-fn run((ptr, len): (u32, u32)) -> u64 {
+fn run() -> u64 {
   unsafe {
-    println!("run called");
-
     let context = JS_CONTEXT.get().unwrap();
     let exports = ENTRY_EXPORTS.get().unwrap();
     let runfn = ENTRY_RUN.get().unwrap();
 
     // Look at what has been written to the input buffer...
-    // NB Possibly we should use the args ptr/len
     let ptr = PTR.lock().unwrap().clone();
     let len = LEN.lock().unwrap().clone();
 
@@ -240,11 +233,8 @@ fn run((ptr, len): (u32, u32)) -> u64 {
       // Error
     }
 
-    // We're expecting an array as return type...
     let retvec = js_to_vec(*context, ret);
-  
     let (ptr, len) = set_buffer(retvec);
-
     return pack_uint32(ptr, len);
   }
 }
