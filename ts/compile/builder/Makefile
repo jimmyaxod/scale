@@ -1,6 +1,9 @@
 .PHONY: cli core test fmt clean
 .DEFAULT_GOAL := cli
 
+current_dir := $(shell pwd)
+export QUICKJS_WASM_SYS_WASI_SDK_PATH := $(current_dir)/wasi-sdk
+
 download-wasi-sdk:
 	./install-wasi-sdk.sh
 
