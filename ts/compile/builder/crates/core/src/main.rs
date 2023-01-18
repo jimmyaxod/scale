@@ -11,6 +11,8 @@ use quickjs_wasm_sys::{
   JS_NewInt64_Ext, JS_NewObject, JS_NewRuntime, JS_NewStringLen, JS_NewUint32_Ext,
   JS_ToCStringLen2, JS_EVAL_TYPE_GLOBAL, JS_GetPropertyStr, JS_GetPropertyUint32, 
   JS_DefinePropertyValueStr, JS_DefinePropertyValueUint32, JS_PROP_C_W_E,
+  JS_TAG_BIG_INT, JS_TAG_BOOL, JS_TAG_EXCEPTION, JS_TAG_INT, JS_TAG_NULL,
+  JS_TAG_OBJECT, JS_TAG_STRING, JS_TAG_UNDEFINED,
 };
 use std::os::raw::{c_char, c_int, c_void};
 
@@ -99,6 +101,7 @@ pub extern "C" fn init() {
         let run_fn = JS_GetPropertyStr(context, exports, run_key.as_ptr());
         ENTRY_RUN.set(run_fn).unwrap();
 
+        // Setup console.log and console.error to pipe through to io::stderr
         let log_cb = console_log_to(io::stderr());
         let error_cb = console_log_to(io::stderr());
 
@@ -108,22 +111,6 @@ pub extern "C" fn init() {
 
         let console_name = CString::new("console").unwrap();
         JS_DefinePropertyValueStr(context, global, console_name.as_ptr(), console, JS_PROP_C_W_E as i32);
-
-
-        // TODO... at the moment anything logged via (console.log/console.error) will not come through.
-        //context.register_globals(io::stderr(), io::stderr()).unwrap();
-
-
-        /*
-        let console_log_callback = unsafe { self.new_callback(console_log_to(log_stream))? };
-        let console_error_callback = unsafe { self.new_callback(console_log_to(error_stream))? };
-        let global_object = self.global_object()?;
-        let console_object = self.object_value()?;
-        console_object.set_property("log", console_log_callback)?;
-        console_object.set_property("error", console_error_callback)?;
-        global_object.set_property("console", console_object)?;
-*/
-
 
         // Setup a function called next() in the global_object
         set_callback(context, global, "scale_fn_next", &nextwrap);
@@ -218,12 +205,12 @@ fn main() {
     }
 }
 
-/*
-TODO: Convert the 'run' function...
 
 #[export_name = "run"]
-fn run((ptr, len): (i32, i32)) -> u64 {
+fn run((ptr, len): (u32, u32)) -> u64 {
   unsafe {
+    println!("run called");
+
     let context = JS_CONTEXT.get().unwrap();
     let exports = ENTRY_EXPORTS.get().unwrap();
     let runfn = ENTRY_RUN.get().unwrap();
@@ -233,43 +220,31 @@ fn run((ptr, len): (i32, i32)) -> u64 {
     let ptr = PTR.lock().unwrap().clone();
     let len = LEN.lock().unwrap().clone();
 
+    // Convert the input data into a js array, and use it as an arg
     let vec = Vec::from_raw_parts(ptr as *mut u8, len as usize, len as usize);
 
-    let array = context.array_value().unwrap();
-    for val in vec.iter() {
-      let jval = context.value_from_i32(i32::from(*val)).unwrap();
-      array.append_property(jval);
+    let input_vals = vec_to_js(*context, vec);
+    let mut args: Vec<JSValue> = Vec::new();
+    args.push(input_vals);
+    let ret = JS_Call(*context, *runfn, *exports, args.len() as i32, args.as_slice().as_ptr() as *mut JSValue);
+
+    let ret_tag = (ret >> 32) as i32;
+    if ret_tag == JS_TAG_EXCEPTION {
+      // TODO Get the exception and handle and return to host?...
+      //
+      println!("Exception from js!");
     }
+
+    if ret_tag != JS_TAG_OBJECT {
+      println!("Return from run was not an object!");
+      // Error
+    }
+
+    // We're expecting an array as return type...
+    let retvec = js_to_vec(*context, ret);
   
-    // Now we need to add the bytes in
-    let output_value = runfn.call(exports, &[array]);
-
-    // output_value should be a byte array again...
-
-    if output_value.is_err() {
-      panic!("{}", output_value.unwrap_err().to_string());
-    }
-
-    // Convert output_value...
-    let mut cursor = Cursor::new(Vec::new());
-    // TODO: Write to the vector...
-
-    let jsval = output_value.unwrap();
-    let len = jsval.get_property("length").unwrap().as_u32_unchecked();
-
-    for i in 0..len {
-      let v = jsval.get_indexed_property(i).unwrap().as_u32_unchecked();
-      let nval:&[u8] = &[v as u8];
-      cursor.write(nval);
-    }
-
-    let mut vec = cursor.into_inner();
-    vec.shrink_to_fit();
-
-    let (ptr, len) = set_buffer(vec);
+    let (ptr, len) = set_buffer(retvec);
 
     return pack_uint32(ptr, len);
   }
 }
-
-*/

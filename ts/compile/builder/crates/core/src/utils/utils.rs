@@ -43,6 +43,8 @@ pub unsafe fn resize_buffer(size: u32) -> *const u8 {
   READ_BUFFER.lock().unwrap().reserve_exact((size - existing_cap) as usize);
   let ptr = READ_BUFFER.lock().unwrap().as_ptr();
 
+  println!("resize_buffer {size}. Existing cap = {existing_cap}");
+
   *PTR.lock().unwrap() = ptr as u32;
   *LEN.lock().unwrap() = size;
   return ptr
