@@ -722,8 +722,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1aab8fc367588b89dcee83ab0fd66b72b50b72fa1904d7095045ace2b0c81c35"
 
 [[package]]
-name = "javy"
-version = "0.1.0"
+name = "jobserver"
+version = "0.1.24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af25a77299a7f711a01975c35a6a424eb6862092cc2d6c72c4ed6cbc56dfc1fa"
+dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "jsbuilder"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "binaryen",
@@ -741,23 +750,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "javy-core"
-version = "0.1.0"
+name = "jsbuilder-core"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "lazy_static",
  "once_cell",
  "quickjs-wasm-sys",
  "wee_alloc",
-]
-
-[[package]]
-name = "jobserver"
-version = "0.1.24"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af25a77299a7f711a01975c35a6a424eb6862092cc2d6c72c4ed6cbc56dfc1fa"
-dependencies = [
- "libc",
 ]
 
 [[package]]

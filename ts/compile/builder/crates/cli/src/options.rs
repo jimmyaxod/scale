@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "javy", about = "JavaScript to WebAssembly toolchain")]
+#[structopt(name = "jsbuilder", about = "JavaScript to WebAssembly")]
 pub struct Options {
     #[structopt(parse(from_os_str))]
     pub input: PathBuf,

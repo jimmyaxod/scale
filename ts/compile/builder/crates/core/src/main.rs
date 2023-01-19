@@ -1,8 +1,15 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
+#[macro_use]
+extern crate lazy_static;
+
 #[path = "utils/utils.rs"]
 mod utils;
+
+
+extern crate quickjs_wasm_sys;
+extern crate once_cell;
 
 use quickjs_wasm_sys::{
   ext_js_exception, ext_js_null, ext_js_undefined, size_t as JS_size_t, JSCFunctionData,

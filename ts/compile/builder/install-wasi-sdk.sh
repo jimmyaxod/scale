@@ -17,4 +17,4 @@ if [[ ! -d $PATH_TO_SDK ]]; then
 fi
 
 # NB This doesn't set externally, so we'd need to build here or something...
-export QUICKJS_WASM_SYS_WASI_SDK_PATH=`pwd`/${PATH_TO_SDK}
+echo "You should set QUICKJS_WASM_SYS_WASI_SDK_PATH to " `pwd`/${PATH_TO_SDK}
