@@ -1,12 +1,20 @@
 #!/bin/bash
 
-# Build the typescript to a single js
+# Build the typescript targets
 npm run build
 
+# Now convert the js to wasm modules...
+
+
+for TARGET in module_middleware module_endpoint
+do
+#TARGET=module_middleware
+
 # Find the nomodule version of the compiled js
-JS=`cat dist/browser.html | tr ">" "\n" | grep nomodule | awk -F'"' '{print $2}'`
+JS=`cat dist/${TARGET}/index.html | tr ">" "\n" | grep nomodule | awk -F'"' '{print $2}'`
 
 # Use the builder to build a wasm module
 BUILDER=../builder/target/release/jsbuilder
 
-${BUILDER} dist${JS}
+${BUILDER} dist/${TARGET}${JS} -o ${TARGET}.wasm
+done

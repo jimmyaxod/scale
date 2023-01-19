@@ -5,8 +5,15 @@
   "browserslist": "> 0.5%, last 2 versions, not dead",
   "default": "dist/browser.html",
   "targets": {
-    "default": {
+    "module_middleware": {
       "source": "src/modules/middleware/index.html",
+      "context": "browser",
+      "isLibrary": false,
+      "optimize": true,
+      "includeNodeModules": true
+    },
+    "module_endpoint": {
+      "source": "src/modules/endpoint/index.html",
       "context": "browser",
       "isLibrary": false,
       "optimize": true,
