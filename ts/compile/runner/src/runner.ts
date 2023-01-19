@@ -20,12 +20,14 @@ import { Context, StringList } from "@loopholelabs/scale-signature-http";
 
 const SCALE_NEXT: string = "scale_fn_next";
 
+type ScaleFunction = (a: Context) => Context;
+
 function mainFunction() {
   console.log("Main function called");
 }
 
 // Run the scale next function
-function runNext(context: Context): Context {
+export function runNext(context: Context): Context {
   // context -> bytes
   let buf = context.encode(new Uint8Array());
   let data = Array.from(buf);
@@ -44,12 +46,10 @@ function runFunction(data: number[]): number[] {
   // Decode data to a context
   const orgContext = Context.decode(Uint8Array.from(data)).value;
 
-  // TODO: Put this functionality elsewhere...
-  // Call back to next()
-  const iContext = runNext(orgContext);
+  // Use the global 'scale' function.
+  const scale = (global as any).scale as ScaleFunction;
 
-  // Lets add a header to show things are working...
-  iContext.Response.Headers.set("FROM_TYPESCRIPT", new StringList(["TRUE"]));
+  const iContext = scale(orgContext);
 
   // Encode the context back into an array
   let buf = iContext.encode(new Uint8Array());

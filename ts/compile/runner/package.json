@@ -6,7 +6,7 @@
   "default": "dist/browser.html",
   "targets": {
     "default": {
-      "source": "src/web/index.html",
+      "source": "src/modules/middleware/index.html",
       "context": "browser",
       "isLibrary": false,
       "optimize": true,
