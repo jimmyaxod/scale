@@ -7,6 +7,6 @@ npm run build
 JS=`cat dist/browser.html | tr ">" "\n" | grep nomodule | awk -F'"' '{print $2}'`
 
 # Use the builder to build a wasm module
-BUILDER=../builder/target/release/javy
+BUILDER=../builder/target/release/jsbuilder
 
 ${BUILDER} dist${JS}
