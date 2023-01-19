@@ -6,7 +6,7 @@ npm run build
 # Now convert the js to wasm modules...
 
 
-for TARGET in module_middleware module_endpoint
+for TARGET in module_middleware module_endpoint module_error
 do
 #TARGET=module_middleware
 

@@ -17,6 +17,7 @@ global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder as typeof global["TextDecoder"];
 
 import { Context, StringList } from "@loopholelabs/scale-signature-http";
+import { encodeError } from "@loopholelabs/polyglot-ts";
 
 const SCALE_NEXT: string = "scale_fn_next";
 
@@ -49,12 +50,19 @@ function runFunction(data: number[]): number[] {
   // Use the global 'scale' function.
   const scale = (global as any).scale as ScaleFunction;
 
-  const iContext = scale(orgContext);
+  try {
+    const iContext = scale(orgContext);
 
-  // Encode the context back into an array
-  let buf = iContext.encode(new Uint8Array());
-  let retdata = Array.from(buf);
-  return retdata;
+    // Encode the context back into an array
+    let buf = iContext.encode(new Uint8Array());
+    let retdata = Array.from(buf);
+    return retdata;
+  } catch(e) {
+    // We need to encode this as an error and return that to the host.
+    let buf = encodeError(new Uint8Array(), e as Error);
+    let retdata = Array.from(buf);
+    return retdata;
+  }
 }
 
 (global as any).Exports = {

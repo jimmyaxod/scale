@@ -18,6 +18,13 @@
       "isLibrary": false,
       "optimize": true,
       "includeNodeModules": true
+    },
+    "module_error": {
+      "source": "src/modules/error/index.html",
+      "context": "browser",
+      "isLibrary": false,
+      "optimize": true,
+      "includeNodeModules": true
     }
   },
   "scripts": {
