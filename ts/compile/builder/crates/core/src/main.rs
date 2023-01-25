@@ -28,13 +28,13 @@ use utils::{READ_BUFFER, RETURN_BUFFER, NEXT_READ_BUFFER};
 
 use std::io::{self, Cursor, Read, Write};
 use std::ffi::CString;
-/*
+
 extern crate wee_alloc;
 
 #[cfg(not(test))]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-*/
+
 
 use once_cell::sync::OnceCell;
 static mut JS_CONTEXT: OnceCell<*mut JSContext> = OnceCell::new();
@@ -216,14 +216,6 @@ fn run() -> u64 {
     let exports = ENTRY_EXPORTS.get().unwrap();
     let runfn = ENTRY_RUN.get().unwrap();
 
-    // Look at what has been written to the input buffer...
-    //let ptr = PTR.lock().unwrap().clone();
-    //let len = LEN.lock().unwrap().clone();
-    // Convert the input data into a js array, and use it as an arg
-    //let vec = Vec::from_raw_parts(ptr as *mut u8, len as usize, len as usize);
-
-    //let vec = *READ_BUFFER.lock().unwrap();
-
     let input_vals = vec_to_js(*context, &READ_BUFFER);
     let mut args: Vec<JSValue> = Vec::new();
     args.push(input_vals);
@@ -233,13 +225,14 @@ fn run() -> u64 {
     if ret_tag == JS_TAG_EXCEPTION {
       // TODO Get the exception and handle and return to host?...
       //
-      //println!("Exception from js!");
+      println!("Exception from js!");
+      // Signal error for now.
       return 900;
     }
 
     if ret_tag != JS_TAG_OBJECT {
       println!("Return from run was not an object!");
-      // Error
+      // Signal error for now.
       return 999;
     }
 
