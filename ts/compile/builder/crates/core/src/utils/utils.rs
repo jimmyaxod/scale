@@ -19,46 +19,41 @@ use std::io::{Cursor, Write};
 use lazy_static::lazy_static;
 use std::sync::Mutex;
 
-lazy_static! {
-  pub static ref PTR: Mutex<u32> = Mutex::new(0);
-  pub static ref LEN: Mutex<u32> = Mutex::new(0);
-  pub static ref READ_BUFFER: Mutex<Vec<u8>> = Mutex::new(Vec::with_capacity(0));
-
-  pub static ref NEXT_PTR: Mutex<u32> = Mutex::new(0);
-  pub static ref NEXT_LEN: Mutex<u32> = Mutex::new(0);
-  pub static ref NEXT_READ_BUFFER: Mutex<Vec<u8>> = Mutex::new(Vec::with_capacity(0));
-}
+//lazy_static! {
+  pub static mut READ_BUFFER: Vec<u8> = Vec::new();
+  pub static mut RETURN_BUFFER: Vec<u8> = Vec::new();
+  pub static mut NEXT_READ_BUFFER: Vec<u8> = Vec::new();
+//}
 
 pub fn set_buffer(v: Vec<u8>) -> (u32, u32) {
-  let ptr = v.as_ptr() as u32;
-  let len = v.len() as u32;
-
-  *READ_BUFFER.lock().unwrap() = v;
-  *PTR.lock().unwrap() = ptr;
-  *LEN.lock().unwrap() = len;
-  return (ptr, len);
+  unsafe {
+    RETURN_BUFFER = v;
+    let ptr = RETURN_BUFFER.as_ptr() as u32;
+    let len = RETURN_BUFFER.len() as u32;
+    return (ptr, len);
+  }
 }
 
 pub unsafe fn resize_buffer(size: u32) -> *const u8 {
-  let existing_cap = READ_BUFFER.lock().unwrap().capacity() as u32;
-  READ_BUFFER.lock().unwrap().reserve_exact((size - existing_cap) as usize);
-  let ptr = READ_BUFFER.lock().unwrap().as_ptr();
-
-  println!("resize_buffer {size}. Existing cap = {existing_cap}");
-
-  *PTR.lock().unwrap() = ptr as u32;
-  *LEN.lock().unwrap() = size;
+  let existing_cap = READ_BUFFER.capacity() as u32;
+  if (existing_cap == size) {   // Quick shortcut
+    // return ptr
+    let ptr = READ_BUFFER.as_ptr();
+    return ptr
+  }
+  READ_BUFFER.reserve_exact((size - existing_cap) as usize);
+  READ_BUFFER.resize(size as usize, 0);
+  let ptr = READ_BUFFER.as_ptr();
   return ptr
 }
 
 pub fn set_next_buffer(v: Vec<u8>) -> (u32, u32) {
-  let ptr = v.as_ptr() as u32;
-  let len = v.len() as u32;
-
-  *NEXT_READ_BUFFER.lock().unwrap() = v;
-  *NEXT_PTR.lock().unwrap() = ptr;
-  *NEXT_LEN.lock().unwrap() = len;
-  return (ptr, len);
+  unsafe {
+    NEXT_READ_BUFFER = v;
+    let ptr = NEXT_READ_BUFFER.as_ptr() as u32;
+    let len = NEXT_READ_BUFFER.len() as u32;
+    return (ptr, len);
+  }
 }
 
 pub fn pack_uint32(ptr: u32, len: u32) -> u64 {
@@ -70,7 +65,7 @@ pub fn unpack_uint32(packed: u64) -> (u32, u32) {
 }
 
 // Convert a vec to a JSValue array of bytes
-pub fn vec_to_js(context: *mut JSContext, v: Vec<u8>) -> JSValue {
+pub fn vec_to_js(context: *mut JSContext, v: &Vec<u8>) -> JSValue {
   unsafe {
     let array = JS_NewArray(context);
     let mut index: u32 = 0;
@@ -90,7 +85,7 @@ pub fn vec_to_js(context: *mut JSContext, v: Vec<u8>) -> JSValue {
 }
 
 pub fn js_to_vec(context: *mut JSContext, v: JSValue) -> Vec<u8> {
-  let mut cursor = Cursor::new(Vec::new());
+  let mut ve = Vec::new();
 
   // The input (jsval2) is expected to be an array of bytes.
   let cstring_key = CString::new("length").unwrap();
@@ -98,11 +93,10 @@ pub fn js_to_vec(context: *mut JSContext, v: JSValue) -> Vec<u8> {
 
   for i in 0..len {
     let v = unsafe { JS_GetPropertyUint32(context, v, i) } as u8;
-    let nval:&[u8] = &[v];
-    cursor.write(nval);
+//    let nval:&[u8] = &[v];
+    ve.push(v);
   }
 
-  let mut vec = cursor.into_inner();
-  vec.shrink_to_fit();
-  return vec;
+  ve.shrink_to_fit();
+  return ve;
 }

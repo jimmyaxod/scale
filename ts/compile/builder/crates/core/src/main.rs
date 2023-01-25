@@ -24,17 +24,17 @@ use quickjs_wasm_sys::{
 use std::os::raw::{c_char, c_int, c_void};
 
 use utils::{pack_uint32, unpack_uint32, vec_to_js, js_to_vec, set_buffer, resize_buffer, set_next_buffer};
-use utils::{PTR, LEN, READ_BUFFER, NEXT_PTR, NEXT_LEN, NEXT_READ_BUFFER};
+use utils::{READ_BUFFER, RETURN_BUFFER, NEXT_READ_BUFFER};
 
 use std::io::{self, Cursor, Read, Write};
 use std::ffi::CString;
-
+/*
 extern crate wee_alloc;
 
 #[cfg(not(test))]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
+*/
 
 use once_cell::sync::OnceCell;
 static mut JS_CONTEXT: OnceCell<*mut JSContext> = OnceCell::new();
@@ -63,7 +63,7 @@ fn nextwrap(context: *mut JSContext, jsval1: JSValue, int1: c_int, jsval2: *mut 
     let packed = _next(ptr, len);
     let (ptr, len) = unpack_uint32(packed);    
     let rvec = Vec::from_raw_parts(ptr as *mut u8, len as usize, len as usize);
-    return vec_to_js(context, rvec);
+    return vec_to_js(context, &rvec);
   }
 }
 
@@ -217,13 +217,14 @@ fn run() -> u64 {
     let runfn = ENTRY_RUN.get().unwrap();
 
     // Look at what has been written to the input buffer...
-    let ptr = PTR.lock().unwrap().clone();
-    let len = LEN.lock().unwrap().clone();
-
+    //let ptr = PTR.lock().unwrap().clone();
+    //let len = LEN.lock().unwrap().clone();
     // Convert the input data into a js array, and use it as an arg
-    let vec = Vec::from_raw_parts(ptr as *mut u8, len as usize, len as usize);
+    //let vec = Vec::from_raw_parts(ptr as *mut u8, len as usize, len as usize);
 
-    let input_vals = vec_to_js(*context, vec);
+    //let vec = *READ_BUFFER.lock().unwrap();
+
+    let input_vals = vec_to_js(*context, &READ_BUFFER);
     let mut args: Vec<JSValue> = Vec::new();
     args.push(input_vals);
     let ret = JS_Call(*context, *runfn, *exports, args.len() as i32, args.as_slice().as_ptr() as *mut JSValue);
@@ -232,12 +233,14 @@ fn run() -> u64 {
     if ret_tag == JS_TAG_EXCEPTION {
       // TODO Get the exception and handle and return to host?...
       //
-      println!("Exception from js!");
+      //println!("Exception from js!");
+      return 900;
     }
 
     if ret_tag != JS_TAG_OBJECT {
       println!("Return from run was not an object!");
       // Error
+      return 999;
     }
 
     let retvec = js_to_vec(*context, ret);
