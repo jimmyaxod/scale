@@ -12,12 +12,11 @@
 */
 
 import "../../runner";
-import { runNext } from "../../runner";
+import { Context as GuestContext } from "../../guest";
 import { Context, StringList } from "@loopholelabs/scale-signature-http";
 
-
-(global as any).scale = function(inContext: Context): Context {
-  const iContext = runNext(inContext);
+function scalefn(inContext: GuestContext): GuestContext {
+  const iContext = inContext.next();
 
   // Lets set the body...
   const encoder = new TextEncoder();
@@ -25,3 +24,6 @@ import { Context, StringList } from "@loopholelabs/scale-signature-http";
   iContext.Response.Body = encBody;
   return iContext;
 }
+
+// Export it
+(global as any).scale = scalefn;

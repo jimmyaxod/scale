@@ -11,6 +11,8 @@
 	limitations under the License.
 */
 
+declare var scale: ScaleFunction;    // This should be defined in the global scope.
+
 import { TextEncoder, TextDecoder } from "text-encoding";
 
 global.TextEncoder = TextEncoder;
@@ -18,10 +20,11 @@ global.TextDecoder = TextDecoder as typeof global["TextDecoder"];
 
 import { Context, StringList } from "@loopholelabs/scale-signature-http";
 import { encodeError } from "@loopholelabs/polyglot-ts";
+import { Context as GuestContext } from "./guest";
 
 const SCALE_NEXT: string = "scale_fn_next";
 
-type ScaleFunction = (a: Context) => Context;
+export type ScaleFunction = (a: GuestContext) => GuestContext;
 
 function mainFunction() {
   console.log("Main function called");
@@ -48,13 +51,15 @@ function runFunction(data: number[]): number[] {
   const orgContext = Context.decode(Uint8Array.from(data)).value;
 
   // Use the global 'scale' function.
-  const scale = (global as any).scale as ScaleFunction;
+  // const scale = (global as any).scale as ScaleFunction;
+
+  const GContext = new GuestContext(orgContext);
 
   try {
-    const iContext = scale(orgContext);
+    const iContext = scale(GContext);
 
     // Encode the context back into an array
-    let buf = iContext.encode(new Uint8Array());
+    let buf = iContext.Context().encode(new Uint8Array());
     let retdata = Array.from(buf);
     return retdata;
   } catch(e) {

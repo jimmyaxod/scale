@@ -12,10 +12,12 @@
 */
 
 import "../../runner";
-import { runNext } from "../../runner";
+import { Context as GuestContext } from "../../guest";
 import { Context, StringList } from "@loopholelabs/scale-signature-http";
 
 
-(global as any).scale = function(inContext: Context): Context {
+function scalefn(inContext: GuestContext): GuestContext {
   throw new Error("Something went wrong");
 }
+
+(global as any).scale = scalefn;
