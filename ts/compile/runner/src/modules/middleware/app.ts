@@ -12,16 +12,14 @@
 */
 
 import "../../runner";
-import { Context as GuestContext } from "../../guest";
-import { Context, StringList } from "@loopholelabs/scale-signature-http";
+import { GuestContext, HttpStringList } from "@loopholelabs/scale-signature-http";
 
 
-function scalefn(inContext: GuestContext): GuestContext {
-  const iContext = inContext.next();
+function scalefn(inContext: GuestContext) {
+  inContext.Next();
 
   // Lets add a header to show things are working...
-  iContext.Response.Headers.set("FROM_TYPESCRIPT", new StringList(["TRUE"]));
-  return iContext;
+  inContext.Response.SetHeader("FROM_TYPESCRIPT", new HttpStringList(["TRUE"]));
 }
 
 (global as any).scale = scalefn;

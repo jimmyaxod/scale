@@ -12,17 +12,12 @@
 */
 
 import "../../runner";
-import { Context as GuestContext } from "../../guest";
-import { Context, StringList } from "@loopholelabs/scale-signature-http";
+import { GuestContext, HttpStringList } from "@loopholelabs/scale-signature-http";
 
-function scalefn(inContext: GuestContext): GuestContext {
-  const iContext = inContext.next();
+function scalefn(inContext: GuestContext) {
+  inContext.Next();
 
-  // Lets set the body...
-  const encoder = new TextEncoder();
-  const encBody = encoder.encode("Hello from typescript!");
-  iContext.Response.Body = encBody;
-  return iContext;
+  inContext.Response.SetBody("Hello from typescript!");
 }
 
 // Export it

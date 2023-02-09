@@ -12,11 +12,10 @@
 */
 
 import "../../runner";
-import { Context as GuestContext } from "../../guest";
-import { Context, StringList } from "@loopholelabs/scale-signature-http";
+import { GuestContext, HttpStringList } from "@loopholelabs/scale-signature-http";
 
 
-function scalefn(inContext: GuestContext): GuestContext {
+function scalefn(inContext: GuestContext) {
   throw new Error("Something went wrong");
 }
 
