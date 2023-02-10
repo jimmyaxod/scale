@@ -11,7 +11,7 @@
 	limitations under the License.
 */
 
-declare var scale: ScaleFunction;    // This should be defined in the global scope.
+declare var scale: ScaleFunction;     // This should be defined in the global scope.
 
 import { TextEncoder, TextDecoder } from "text-encoding";
 
@@ -23,7 +23,7 @@ import { GuestContext, HttpContext, HttpRequest, HttpResponse, HttpStringList } 
 export type ScaleFunction = (a: GuestContext) => GuestContext;
 
 function mainFunction() {
-  console.log("Main function called");
+//  console.log("Main function called");
 }
 
 // Create a new dummy GuestContext.
@@ -33,26 +33,24 @@ var ctx = new GuestContext(new HttpContext(
 ));
 
 // Our own run function wrapper
-function runFunction(): number {
-  console.log("runFunction");
-
+function runFunction(): bigint {
   ctx.FromReadBuffer();   // Read from the read buffer.
 
   try {
     scale(ctx);
 
     let [ptr, len] = ctx.ToWriteBuffer();
-    return ptr << 32 | len;
+    return BigInt(ptr) << BigInt(32) | BigInt(len);
   } catch(e) {
     let [ptr, len] = ctx.ErrorWriteBuffer(e as Error);
-    return ptr << 32 | len;
+    return BigInt(ptr) << BigInt(32) | BigInt(len);
   }
+
 }
 
 // Route the resize through to the guestContext
 function resizeFunction(size: number): number {
   let n = ctx.Resize(size);
-  console.log("Resize " + size + " -> " + n);
   return n;
 }
 
