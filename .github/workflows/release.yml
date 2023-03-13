@@ -31,7 +31,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: engine
-          path: target/wasm32-wasi/release/jsbuilder_core.wasm
+          path: ts/compile/builder/target/wasm32-wasi/release/jsbuilder_core.wasm
 
   compile_cli:
     name: compile_cli-${{ matrix.name }}
