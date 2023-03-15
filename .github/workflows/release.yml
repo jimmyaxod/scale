@@ -151,7 +151,7 @@ jobs:
         destination_repo: 'loopholelabs/scale-cli'
         destination_folder: 'pkg/build'
         destination_base_branch: 'staging'
-        destination_head_branch: 'staging'
+        destination_head_branch: 'jsbuilder-${{ github.event.release.tag_name }}'
         user_email: 'workflow@loopholelabs.io'
         user_name: 'workflow'
         pull_request_reviewers: ''
