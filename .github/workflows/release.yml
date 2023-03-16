@@ -130,9 +130,9 @@ jobs:
       with:
         files: ts/compile/builder
 
-    - name: Run step
-      if: steps.changed-files.outputs.any_changed == 'true'
-      run: # exit_with_success
+#    - name: Run step
+#      if: steps.changed-files.outputs.any_changed == 'true'
+#      run: # exit_with_success
 
   pull-request:
     runs-on: ubuntu-latest
